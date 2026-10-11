@@ -1,6 +1,7 @@
 package com.kartikeya.vcradio.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -43,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kartikeya.vcradio.ui.theme.RadioAmber
+import com.kartikeya.vcradio.R
 import com.kartikeya.vcradio.ui.theme.RadioBlack
 import com.kartikeya.vcradio.ui.theme.RadioDim
 import com.kartikeya.vcradio.ui.theme.RadioInk
@@ -87,13 +91,7 @@ fun RadioScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.weight(1.15f))
-            Text(
-                text = state.preset,
-                color = RadioDim,
-                fontSize = 12.sp,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Medium,
-            )
+            StationLogo(state.stationId, state.stationName)
             Spacer(Modifier.height(18.dp))
             AnimatedContent(targetState = state.stationName) { name ->
                 Text(
@@ -140,6 +138,32 @@ fun RadioScreen(
             }
             Spacer(Modifier.weight(0.65f))
         }
+    }
+}
+
+@Composable
+private fun StationLogo(stationId: String?, stationName: String) {
+    val resource = when {
+        stationId?.contains("wild") == true -> R.drawable.wildstyle
+        stationId?.contains("flash") == true -> R.drawable.flash
+        stationId?.contains("kchat") == true -> R.drawable.kchat
+        stationId?.contains("fever") == true -> R.drawable.fever
+        stationId?.contains("vrock") == true -> R.drawable.vrock
+        stationId?.contains("vcpr") == true -> R.drawable.vcpr
+        stationId?.contains("espant") == true -> R.drawable.espantoso
+        stationId?.contains("emotion") == true -> R.drawable.emotion
+        stationId?.contains("wave") == true -> R.drawable.wave103
+        else -> null
+    }
+    if (resource == null) {
+        Spacer(Modifier.height(56.dp))
+    } else {
+        Image(
+            painter = painterResource(resource),
+            contentDescription = "$stationName station logo",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(76.dp),
+        )
     }
 }
 

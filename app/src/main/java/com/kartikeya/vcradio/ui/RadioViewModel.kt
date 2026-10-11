@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class RadioUiState(
     val stationName: String = "VICE CITY RADIO",
-    val preset: String = "CONNECTING",
+    val stationId: String? = null,
     val isPlaying: Boolean = false,
     val powered: Boolean = false,
     val connected: Boolean = false,
@@ -58,7 +58,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 }.onFailure {
                     _uiState.value = RadioUiState(
                         stationName = "SERVICE UNAVAILABLE",
-                        preset = "RETRY BY REOPENING",
                         error = "Radio service could not connect.",
                     )
                 }
@@ -83,8 +82,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = RadioUiState(
             stationName = extras.getString(RadioPlaybackService.EXTRA_STATION_NAME)
                 ?: metadata.title?.toString() ?: "VICE CITY RADIO",
-            preset = extras.getString(RadioPlaybackService.EXTRA_PRESET)
-                ?: metadata.description?.toString() ?: "NO STATIONS",
+            stationId = extras.getString(RadioPlaybackService.EXTRA_STATION_ID),
             isPlaying = active.isPlaying,
             powered = powered,
             connected = true,

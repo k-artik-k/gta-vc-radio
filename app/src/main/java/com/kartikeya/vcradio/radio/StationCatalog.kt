@@ -5,17 +5,19 @@ import java.util.Locale
 
 /** Builds the catalog from the installed assets, so adding an MP3 needs no Kotlin edit. */
 object StationCatalog {
+    private val supportedExtensions = setOf("mp3", "m4a")
     private val familiarOrder = listOf(
         "WILDSTYLE", "FLASH", "KCHAT", "FEVER", "VROCK", "VCPR", "ESPANT", "EMOTION", "WAVE",
     )
 
     fun fromAssets(assetManager: AssetManager): List<Station> =
         discover(assetManager, "stations")
-            .filter { it.endsWith(".mp3", ignoreCase = true) }
+            .filter { it.substringAfterLast('.', "").lowercase(Locale.ROOT) in supportedExtensions }
             .map { assetPath ->
                 val fileName = assetPath.substringAfterLast('/')
                 Station(
-                    id = assetPath.lowercase(Locale.ROOT),
+                    // Keep this identity stable if a bundled source is transcoded from MP3 to M4A.
+                    id = assetPath.substringBeforeLast('.').lowercase(Locale.ROOT),
                     assetPath = assetPath,
                     displayName = titleFor(fileName),
                     preset = 0,

@@ -1,10 +1,12 @@
 package com.kartikeya.vcradio.playback
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -18,6 +20,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.kartikeya.vcradio.radio.BroadcastClock
+import com.kartikeya.vcradio.MainActivity
 import com.kartikeya.vcradio.radio.SavedRadioState
 import com.kartikeya.vcradio.radio.Station
 import com.kartikeya.vcradio.radio.StationAnchor
@@ -42,13 +45,13 @@ class RadioPlaybackService : MediaSessionService() {
         const val EXTRA_POWERED = "powered"
         const val EXTRA_STATION_ID = "station_id"
         const val EXTRA_STATION_NAME = "station_name"
-        const val EXTRA_PRESET = "preset"
         const val EXTRA_ERROR = "error"
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val broadcastClock = BroadcastClock()
     private lateinit var player: ExoPlayer
+    private lateinit var sessionPlayer: NonSeekableSessionPlayer
     private lateinit var mediaSession: MediaSession
     private lateinit var store: StationStateStore
     private var stations: List<Station> = emptyList()
@@ -72,7 +75,17 @@ class RadioPlaybackService : MediaSessionService() {
             repeatMode = Player.REPEAT_MODE_ONE
             addListener(playerListener)
         }
-        mediaSession = MediaSession.Builder(this, player)
+        sessionPlayer = NonSeekableSessionPlayer(player)
+        val launchIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        mediaSession = MediaSession.Builder(this, sessionPlayer)
+            .setSessionActivity(launchIntent)
             .setCallback(sessionCallback)
             .build()
         configureNotificationButtons()
@@ -279,7 +292,6 @@ class RadioPlaybackService : MediaSessionService() {
             putBoolean(EXTRA_POWERED, radioState.powered)
             putString(EXTRA_STATION_ID, station?.id)
             putString(EXTRA_STATION_NAME, station?.displayName)
-            putString(EXTRA_PRESET, station?.let { "Preset ${it.preset}" })
             putString(EXTRA_ERROR, lastError)
         })
     }
@@ -287,7 +299,6 @@ class RadioPlaybackService : MediaSessionService() {
     private fun metadataFor(station: Station): MediaMetadata = MediaMetadata.Builder()
         .setTitle(station.displayName)
         .setArtist("Vice City Radio")
-        .setDescription("Preset ${station.preset}")
         .build()
 
     private fun persist() {
@@ -310,9 +321,22 @@ class RadioPlaybackService : MediaSessionService() {
 
 private fun SavedRadioState.sanitizeFor(catalog: List<Station>): SavedRadioState {
     val validIds = catalog.map { it.id }.toSet()
+    val migratedAnchors = catalog.mapNotNull { station ->
+        val anchor = stations[station.id]
+            ?: stations["${station.id}.mp3"]
+            ?: stations["${station.id}.m4a"]
+            ?: return@mapNotNull null
+        station.id to anchor.copy(stationId = station.id)
+    }.toMap()
     return copy(
-        currentStationId = currentStationId?.takeIf { it in validIds } ?: catalog.firstOrNull()?.id,
-        stations = stations.filterKeys { it in validIds }.mapValues { (_, anchor) ->
+        currentStationId = currentStationId?.let { savedId ->
+            when {
+                savedId in validIds -> savedId
+                savedId.substringBeforeLast('.') in validIds -> savedId.substringBeforeLast('.')
+                else -> null
+            }
+        } ?: catalog.firstOrNull()?.id,
+        stations = migratedAnchors.mapValues { (_, anchor) ->
             anchor.copy(
                 durationMs = anchor.durationMs.coerceAtLeast(0L),
                 anchorPositionMs = anchor.anchorPositionMs.coerceAtLeast(0L),
@@ -320,4 +344,10 @@ private fun SavedRadioState.sanitizeFor(catalog: List<Station>): SavedRadioState
             )
         },
     )
+}
+
+/** The system UI must not expose a disabled progress slider for a radio dial. */
+private class NonSeekableSessionPlayer(player: Player) : ForwardingPlayer(player) {
+    override fun isCurrentMediaItemSeekable(): Boolean = false
+    override fun getDuration(): Long = C.TIME_UNSET
 }

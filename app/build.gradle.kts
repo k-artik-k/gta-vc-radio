@@ -19,6 +19,13 @@ android {
 
     buildFeatures { compose = true; buildConfig = true }
 
+    // Local media is already compressed. Keeping it uncompressed in the APK allows random access
+    // from AssetDataSource and avoids a pointless inflate step before playback.
+    androidResources {
+        noCompress += "mp3"
+        noCompress += "m4a"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
